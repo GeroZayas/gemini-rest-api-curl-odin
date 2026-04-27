@@ -1,5 +1,6 @@
 package main
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:os"
@@ -7,7 +8,71 @@ import "core:strings"
 import "vendor:curl"
 import rl "vendor:raylib"
 
+
+// ---------------------------------------------
+// TO DO:
+// Parsear el json para sacar solo la respuesta
+// ---------------------------------------------
+
+
 GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
+
+Part :: struct {
+	text: string,
+}
+
+Content :: struct {
+	parts: []Part,
+}
+
+Candidate :: struct {
+	content: Content,
+}
+
+GeminiResponse :: struct {
+	candidates: []Candidate,
+}
+
+
+main :: proc() {
+
+	context.logger = log.create_console_logger()
+
+	the_input := get_input_stdin_from_user()
+
+	raw_response := make_request_to_gemini(the_input)
+
+	// fmt.println(raw_response)
+
+	fmt.println("------------------------------------------")
+
+	response, ok := extract_text_from_response(raw_response)
+
+	if !ok {
+		fmt.println("No pude leer el texto del response")
+		return
+	}
+
+	fmt.println(response)
+
+}
+
+extract_text_from_response :: proc(json_raw: string) -> (string, bool) {
+	response: GeminiResponse
+	err := json.unmarshal_string(json_raw, &response)
+	if err != nil {
+		return "", false
+	}
+	if len(response.candidates) == 0 {
+		return "", false
+	}
+	if len(response.candidates[0].content.parts) == 0 {
+		return "", false
+	}
+
+	return response.candidates[0].content.parts[0].text, true
+}
+
 
 make_request_to_gemini :: proc(the_input: string) -> string {
 
@@ -49,8 +114,12 @@ make_request_to_gemini :: proc(the_input: string) -> string {
 		panic("curl FAILED!")
 	}
 
-	response_string := strings.to_string(response_buffer)
+	raw_response_string := strings.to_string(response_buffer)
 
+	response_string, clone_err := strings.clone(raw_response_string)
+	if clone_err != nil {
+		panic("Error clonando response string")
+	}
 	return response_string
 
 }
@@ -61,21 +130,6 @@ write_callback :: proc(ptr: rawptr, size, nmemb: uint, userdata: rawptr) -> uint
 	chunk := strings.string_from_ptr(cast(^byte)ptr, int(n))
 	strings.write_string(builder, chunk)
 	return uint(n)
-}
-
-
-main :: proc() {
-
-	context.logger = log.create_console_logger()
-
-	the_input := get_input_stdin_from_user()
-
-	fmt.println(typeid_of(type_of(the_input)))
-
-	response := make_request_to_gemini(the_input)
-
-	fmt.println(response)
-
 }
 
 
