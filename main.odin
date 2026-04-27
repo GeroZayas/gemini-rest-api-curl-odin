@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:strings"
 import "vendor:curl"
@@ -8,24 +9,11 @@ import rl "vendor:raylib"
 
 GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
 
-main :: proc() {
+make_request_to_gemini :: proc(the_input: string) -> string {
 
 	GEMINI_API_KEY := load_gemini_api_key_env()
 
-	fmt.println("PROMPT >>> ")
-
-	prompt_buffer: [256]u8
-
-	n, r_err := os.read(os.stdin, prompt_buffer[:])
-	if r_err != os.ERROR_NONE {
-		fmt.println("ERROR LEYENDO INPUT:", r_err)
-		return
-	}
-
-	input := string(prompt_buffer[:n])
-	input = strings.trim_space(input)
-
-	json_data := fmt.ctprintf("{{\"contents\":[{{\"parts\":[{{\"text\":%q}}]}}]}}", input)
+	json_data := fmt.ctprintf("{{\"contents\":[{{\"parts\":[{{\"text\":%q}}]}}]}}", the_input)
 
 	api_key_header := fmt.ctprintf("x-goog-api-key: %s", GEMINI_API_KEY)
 
@@ -58,11 +46,12 @@ main :: proc() {
 
 	err := curl.easy_perform(handle)
 	if err != .E_OK {
-		fmt.println("curl FAILED!:", err)
-		return
+		panic("curl FAILED!")
 	}
 
-	fmt.println(strings.to_string(response_buffer))
+	response_string := strings.to_string(response_buffer)
+
+	return response_string
 
 }
 
@@ -72,4 +61,45 @@ write_callback :: proc(ptr: rawptr, size, nmemb: uint, userdata: rawptr) -> uint
 	chunk := strings.string_from_ptr(cast(^byte)ptr, int(n))
 	strings.write_string(builder, chunk)
 	return uint(n)
+}
+
+
+main :: proc() {
+
+	context.logger = log.create_console_logger()
+
+	the_input := get_input_stdin_from_user()
+
+	fmt.println(typeid_of(type_of(the_input)))
+
+	response := make_request_to_gemini(the_input)
+
+	fmt.println(response)
+
+}
+
+
+get_input_stdin_from_user :: proc() -> string {
+	fmt.println("PROMPT >>> ")
+
+	prompt_buffer: [1024]u8
+
+	n, r_err := os.read(os.stdin, prompt_buffer[:])
+
+	if r_err != os.ERROR_NONE {
+		panic("Error leyendo el the_input")
+	}
+
+	input := string(prompt_buffer[:n])
+	input = strings.trim_space(input)
+
+	// clonamos aquí para poder tener la var de string como tal
+	// y que viva en memoria y poder devolverla, porque
+	// el buffer se libera al salir de este proc
+	cloned_input, err := strings.clone(input)
+	if err != nil {
+		panic("Error clonando el input")
+	}
+
+	return cloned_input
 }

@@ -8,7 +8,7 @@
 Nuestro programa hará lo equivalente al siguiente ejemplo de llamada de `curl` en la terminal:
 
 ```bash
-curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent" \
+curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent" \
   -H "x-goog-api-key: real-api-key-here" \
   -H "Content-Type: application/json" \
   -X POST \
@@ -27,7 +27,7 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-p
 
 > Se require una API KEY de Google Gemini para poder realizar solicitudes a la API
 
-🎯 **TO DO**: PONER COMO SACAR UNA API KEY de Gemini
+👀 Para obtener una API KEY de Google Gemini: https://ai.google.dev/gemini-api/docs/api-key?hl=es-419
 
 Empezamos como siempre creando un proyecto de Odin con un `main.odin` y poniendo los elementos básicos de `package` y el procedure `main`, que siempre se necesita. Recuerda que solo puede haber un procedure llamado así. Es importante recordar que en Odin hablamos de **procedimientos** en vez de **funciones**, como en otros lenguajes, pero son efectivamente lo mismo.
 
@@ -54,11 +54,9 @@ main :: proc(){
 }
 ```
 
-Necesitamos `fmt` para imprimir texto en pantalla. El `os` nos permitirá recibir input desde la terminal con `stdin` cuando el usuario inserte su propio _prompt_ para el LLM. `strings` nos permitirá trabajar con las strings del programa y tendremos que convertir en `cstrings` los elementos de texto que tengamos, ya que `curl` que está basado en `libcurl` es una librería de C, con lo cual los strings debe ser _null terminated_, que no es el por defecto en Odin. Además, `strings` nos permitirá limpiar y dar formato a nuestros elementos de texto. Y por último, obviamente, tenemos que traer `curl` para poder hacer todas esas operaciones HTTP.
+Necesitamos `fmt` para imprimir texto en pantalla. El `os` nos permitirá recibir input desde la terminal con `stdin` cuando el usuario inserte su propio _prompt_ para el LLM. `strings` nos permitirá trabajar con las strings del programa y tendremos que convertir en `cstring` los elementos de texto que tengamos, ya que `curl` que está basado en `libcurl` es una librería de C, con lo cual los strings debe ser _null terminated_, que no es el por defecto en Odin. Además, `strings` nos permitirá limpiar y dar formato a nuestros elementos de texto. Y por último, obviamente, tenemos que traer `curl` para poder hacer todas esas operaciones HTTP.
 
 IMPORTANTE notar cómo `fmt`, `os` y `strings` viene de `core`, mientras que `curl` viene de `vendor`.
-
-🎯 **TO DO**: Poner las diferencias entre core y vendor en Odin.
 
 **¿Cuál va a ser la estructura general de nuestro programa? **
 
@@ -87,7 +85,7 @@ import "core:strings"
 import "vendor:curl"
 
 // CONSTANTE ⬇️
-GEMINI_MODEL :: "gemini-3.1-flash-preview"
+GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
 
 main :: proc(){
 	// ...
@@ -96,7 +94,7 @@ main :: proc(){
 
 Y ahora vamos con el desarrollo de nuestro procedimiento principal:
 
-Lo primero que vamos a hacer es cargar la API KEY que necesitamos pasar luego en nuestro _request_ para poder hablar con el Gemini LLM. Para ello, debemos tener nueva API KEY en un archivo **oculto** (siempre poner en el _.gitignore_) llamado _.env_, que es donde solemos colocar las variables de entorno (_environment variables_). Y para poder leer desde este archivo, vamos primeramente a crear un pequeño procedimiento que cargue estos datos desde _.env_ y devuelva una string con la llave API.
+Lo primero que vamos a hacer es cargar la API KEY que necesitamos pasar luego en nuestro _request_ para poder hablar con el Gemini LLM. Para ello, debemos tener nueva API KEY que debemos exportar en nuestro entorno, donde ejecutemos el programa, para que la llave pueda ser correctamente cargada en nuestro código. Por ejemplo, haciendo esto en la terminal, en la sesión en la que ejecutaremos nuestro programa: `export GEMINI_API_KEY=the-real-api-key-aquí` y luego `odin run .` o ejecutar directamente el binario compilado `./builds/main`.
 
 ```odin
 load_gemini_api_key_env :: proc() -> string {
@@ -108,21 +106,11 @@ load_gemini_api_key_env :: proc() -> string {
 }
 ```
 
-Nótese cómo usamos aquí `os.lookup_env()` y le pasamos el nombre de la variable que queremos cargar desde el _.env_ y el asignador de memoria del contexto en donde lo pondremos (_context.allocator_). Y si no encontramos esta llave, hacemos un _panic()_ para detener nuestro programa, que sin este elemento, no funcionará.
+Nótese cómo usamos aquí `os.lookup_env()` y le pasamos el nombre de la variable que queremos cargar desde el entorno y el asignador de memoria del contexto en donde lo pondremos (_context.allocator_). Y si no encontramos esta llave, hacemos un _panic()_ para detener nuestro programa, que sin este elemento, no funcionará.
 
 Una vez tenemos este procedimiento, que puede estar en nuestro módulo principal (_main.odin_) o en otro (por ejemplo, _utils.odin_, siempre poniendo primero `package main`, para que formen parte del mismo espacio, package) podemos pasar a llamarlo y guardar el resultado en nuestra variable `GEMINI_API_KEY`:
 
 ```odin
-package main
-
-import "core:fmt"
-import "core:os"
-import "core:strings"
-import "vendor:curl"
-
-// CONSTANTE ⬇️
-GEMINI_MODEL :: "gemini-3.1-flash-preview"
-
 main :: proc(){
 	GEMINI_API_KEY := load_gemini_api_key_env()
 
@@ -137,17 +125,13 @@ fmt.println("PROMPT >>> ")
 prompt_buffer: [256]u8 // 👈 array
 ```
 
-Vemos cómo se crea un _array_ fijo (fix array, no varía su tamaño) de 256 elementos de tipo `u8` en este caso.
+Vemos cómo se crea un _array_ fijo (fix array, no varía su tamaño) de 256 elementos de tipo `u8` en este caso. Nótese que si se deseara poder pasar prompts más largo, habría que dotar al buffer de mucha más memoria, según fuera necesario.
 
 Y luego, usamos `os.read` para leer desde `os.stdin`, o sea, para recibir lo que venga de la entrada estándar, y eso lo guardamos en el _buffer_ anteriormente creado para ello. 👀 **OJO**: nótese cómo usamos un _slice_ que es una vista flexible directa de nuestro _array_, o sea, es referenciar directamente la zona de memoria donde literalmente reside nuestro _buffer_.
 
 Nos damos cuenta de que `os.read()` devuelve dos elementos: a) el número de bytes leídos, de tipo int, y b) un error, si se produce. Esto nos permite manejar la situación en la se produzca un error. Vemos aquí que chequeamos si el valor de `r_err` es diferente de `os.ERROR_NONE` y procedemos a lidiar con ello.
 
 ```odin
-fmt.println("PROMPT >>> ")
-
-prompt_buffer: [256]u8
-
 n, r_err := os.read(os.stdin, prompt_buffer[:])
 if r_err != os.ERROR_NONE {
 	fmt.println("ERROR LEYENDO INPUT:", r_err)
@@ -158,16 +142,6 @@ if r_err != os.ERROR_NONE {
 Una vez hemos leído desde `stdin` lo que nos haya pasado el usuario, entonces convertimos esos bytes `u8` en un `string` propiamente, y lo limpiamos con el fin quitar espacios no deseamos. Nótese como usamos `strings` para ello.
 
 ```odin
-fmt.println("PROMPT >>> ")
-
-prompt_buffer: [256]u8
-
-n, r_err := os.read(os.stdin, prompt_buffer[:])
-if r_err != os.ERROR_NONE {
-	fmt.println("ERROR LEYENDO INPUT:", r_err)
-	return
-}
-
 input := string(prompt_buffer[:n])   // 👈 leemos la cantidad de bytes recibidos y
                                      // lo hacemos un string
 input = strings.trim_space(input)    // 👈 quitamos los espacios extra
@@ -181,22 +155,9 @@ Aquí es importante notar lo siguiente en cuanto a formato de strings en Odin:
   - `c` porque se trata de strings de C
   - `t` porque se trata de un _temporary_ string (asignación de memoria temporal)
   - `printf` para hacer string con formato
-- y usaremos `%q` para denotar que el elemento incluído es una _quote_, que implica que llevará _" "_ comillas, o sea que no es escaparán (eliminarán).
+- y usaremos `%q` para denotar que el elemento incluído es una _quote_, que implica que llevará _" "_ comillas, o sea que no se eliminarán.
 
 ```odin
-fmt.println("PROMPT >>> ")
-
-prompt_buffer: [256]u8
-
-n, r_err := os.read(os.stdin, prompt_buffer[:])
-if r_err != os.ERROR_NONE {
-	fmt.println("ERROR LEYENDO INPUT:", r_err)
-	return
-}
-
-input := string(prompt_buffer[:n])
-input = strings.trim_space(input)
-
 // ----------------------------------------------------------------------------------
 // 🔽 nótese cómo se escapan '\' las comillas
 
@@ -207,20 +168,12 @@ json_data := fmt.ctprintf("{{\"contents\":[{{\"parts\":[{{\"text\":%q}}]}}]}}", 
 Hacemos lo mismo con el API KEY header:
 
 ```odin
-json_data := fmt.ctprintf("{{\"contents\":[{{\"parts\":[{{\"text\":%q}}]}}]}}", input)
-
-// 🔽 new
 api_key_header := fmt.ctprintf("x-goog-api-key: %s", GEMINI_API_KEY)
 ```
 
 Y luego comenzamos a crear una lista enlazada (_linked list_) de _headers_ en `curl`. Vamos a usar `curl.slist_append()` para crear la lista y añadimos `nil` primeramente solo para crearla. Luego, ya creada, la referimos para seguir añadiendo elementos de texto e ir conformando los headers.
 
 ```odin
-json_data := fmt.ctprintf("{{\"contents\":[{{\"parts\":[{{\"text\":%q}}]}}]}}", input)
-
-api_key_header := fmt.ctprintf("x-goog-api-key: %s", GEMINI_API_KEY)
-
-
 // ----------------------------------------------------------------------------------
 // 🔽 Nótese el `defer`
 
@@ -249,10 +202,13 @@ Lo siguiente es empezar a crear opciones para nuestra transferencia. Para ello e
 easy_setopt :: proc(curl: ^CURL, option: option, #c_vararg args: ..any) -> code ---
 ```
 
-Ponemos la `url` que vamos a llamar y añadimos las opciones de HTTPHEADER, POST y los campos de post, nuestro `json_data`, POSTFIELDS:
+Ponemos la `url` que vamos a llamar, usando igualmente `fmt.tprintf()`, para incluir el `GEMINI_MODEL` determinado anteriormente y añadimos las opciones de HTTPHEADER, POST y los campos de post, nuestro `json_data`, POSTFIELDS:
 
 ```odin
-url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+url := fmt.tprintf(
+		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent",
+		GEMINI_MODEL,
+	)
 
 curl.easy_setopt(handle, .URL, cstring(raw_data(url))) // NÓTESE: cstring
 curl.easy_setopt(handle, .HTTPHEADER, headers)
@@ -274,9 +230,6 @@ defer strings.builder_destroy(&response_buffer)
 Añadimos ahora dos opciones más a nuestro `handle` de `curl`, a) una para escribir los datos y b) otra para llamar la función de escritura deseada.
 
 ```odin
-response_buffer := strings.builder_make()
-defer strings.builder_destroy(&response_buffer)
-
 curl.easy_setopt(handle, .WRITEDATA, &response_buffer)
 curl.easy_setopt(handle, .WRITEFUNCTION, write_callback)
 ```
@@ -316,12 +269,6 @@ if err != .E_OK {                                        // <--- código de erro
 Y luego, imprimimos en pantalla la respuesta recibida: usando el `strings.to_string()` con el contenido de nuestro _response buffer_
 
 ```odin
-err := curl.easy_perform(handle)
-if err != .E_OK {
-	fmt.println("curl FAILED!:", err)
-	return
-}
-
 fmt.println(strings.to_string(response_buffer))
 ```
 
@@ -334,9 +281,8 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 import "vendor:curl"
-import rl "vendor:raylib"
 
-GEMINI_MODEL :: "gemini-3.1-flash-preview"
+GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
 
 main :: proc() {
 
@@ -370,7 +316,10 @@ main :: proc() {
 	defer curl.easy_cleanup(handle)
 	// -----------------
 
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent"
+	url := fmt.tprintf(
+		"https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent",
+		GEMINI_MODEL,
+	)                                               // Nótese el %s
 
 	curl.easy_setopt(handle, .URL, cstring(raw_data(url)))
 	curl.easy_setopt(handle, .HTTPHEADER, headers)
@@ -411,3 +360,37 @@ load_gemini_api_key_env :: proc() -> string {
 
 
 ```
+
+### Resumen de **procs** y **structs** usados:
+
+- `os`:
+  - _os.read()_
+    - `os.read(os.stdin, prompt_buffer[:])`
+  - _os.ERROR_NONE_
+  - _os.lookup_env()_
+    - `os.lookup_env("GEMINI_API_KEY", context.allocator)`
+- `strings`
+  - _strings.trim_space()_
+    - `strings.trim_space(input)`
+  - _strings.builder_make()_
+  - _strings.builder_destroy()_
+  - _strings.to_string()_
+  - _strings.string_from_ptr()_
+    - `strings.string_from_ptr(cast(^byte)ptr, int(n))`
+  - _strings.write_string()_
+    - `strings.write_string(builder, chunk)`
+- `curl`
+  - _curl.slist_append()_
+    - `curl.slist_append(nil, cstring("Content-Type: application/json"))`
+  - _curl.slist_free_all()_
+  - _curl.easy_init()_
+  - _curl.easy_cleanup()_
+  - _curl.easy_setopt()_
+    - `curl.easy_setopt(handle, .URL, cstring(raw_data(url)))`
+    - `.URL`
+    - `.HTTPHEADER`
+    - `.POST`
+    - `.POSTFIELDS`
+    - `.WRITEDATA`
+    - `.WRITEFUNCTION`
+  - _curl.easy_perform()_

@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "odin: build debug",
+            "type": "shell",
+            "command": "odin",
+            "args": [
+                "build",
+                ".",
+                "-debug",
+                "-o:none",
+                "-out:./builds/main"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}
