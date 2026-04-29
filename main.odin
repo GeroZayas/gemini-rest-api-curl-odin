@@ -18,11 +18,9 @@ package main
 
 import "core:encoding/json"
 import "core:fmt"
-import "core:log"
 import "core:os"
 import "core:strings"
 import "vendor:curl"
-import rl "vendor:raylib"
 
 
 GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
