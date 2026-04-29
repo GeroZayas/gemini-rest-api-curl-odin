@@ -44,7 +44,6 @@ GeminiResponse :: struct {
 
 main :: proc() {
 
-	context.logger = log.create_console_logger()
 
 	the_input := get_input_stdin_from_user()
 
