@@ -1,3 +1,19 @@
+
+/*
+v2.0
+
+This new version has improved the Response handling and the overall
+structure of the program. 
+
+We now parse the raw json response and extract only the `text` part
+that we want to print to the screen, ignoring the rest of 
+metadata.
+
+In terms of structure, we have separated the logic into appropriate
+procedures with clear inputs and outputs.
+
+*/
+
 package main
 
 import "core:encoding/json"
@@ -7,12 +23,6 @@ import "core:os"
 import "core:strings"
 import "vendor:curl"
 import rl "vendor:raylib"
-
-
-// ---------------------------------------------
-// TO DO:
-// Parsear el json para sacar solo la respuesta
-// ---------------------------------------------
 
 
 GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
