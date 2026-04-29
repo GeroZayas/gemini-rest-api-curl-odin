@@ -18,11 +18,10 @@ package main
 
 import "core:encoding/json"
 import "core:fmt"
-import "core:log"
 import "core:os"
 import "core:strings"
 import "vendor:curl"
-import rl "vendor:raylib"
+// import rl "vendor:raylib"
 
 
 GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
@@ -45,8 +44,6 @@ GeminiResponse :: struct {
 
 
 main :: proc() {
-
-	context.logger = log.create_console_logger()
 
 	the_input := get_input_stdin_from_user()
 
@@ -96,7 +93,7 @@ make_request_to_gemini :: proc(the_input: string) -> string {
 	headers = curl.slist_append(headers, api_key_header)
 	defer curl.slist_free_all(headers)
 
-
+	
 	// --- Init curl ---
 	handle := curl.easy_init()
 	if handle == nil do panic("curl INIT FAILED!")
