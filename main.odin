@@ -1,16 +1,8 @@
 
 /*
-v2.0
+v3.0
 
-This new version has improved the Response handling and the overall
-structure of the program. 
-
-We now parse the raw json response and extract only the `text` part
-that we want to print to the screen, ignoring the rest of 
-metadata.
-
-In terms of structure, we have separated the logic into appropriate
-procedures with clear inputs and outputs.
+This new version has ...
 
 */
 
@@ -20,6 +12,7 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:time"
 import "vendor:curl"
 
 
@@ -45,6 +38,7 @@ GeminiResponse :: struct {
 main :: proc() {
 
 
+	fmt.println("PROMPT >>> ")
 	the_input := get_input_stdin_from_user()
 
 	raw_response := make_request_to_gemini(the_input)
@@ -61,6 +55,27 @@ main :: proc() {
 	}
 
 	fmt.println(response)
+
+	fmt.println("Name of File: >>> ")
+	the_name := get_input_stdin_from_user()
+
+	file_name: string
+
+	if the_name == "" {
+		file_name = generate_file_name()
+	} else {
+		file_name = the_name
+	}
+
+	fmt.printfln("SAVING FILE TO `%s`...", file_name)
+	save_success := save_to_local_MD_file(file_name, response)
+
+	if !save_success {
+		fmt.println("❌ Saving file NOT SUCCESSFUL!")
+	} else {
+		fmt.println("✅ Saving file SUCCESSFUL!")
+	}
+
 
 }
 
@@ -141,7 +156,6 @@ write_callback :: proc(ptr: rawptr, size, nmemb: uint, userdata: rawptr) -> uint
 
 
 get_input_stdin_from_user :: proc() -> string {
-	fmt.println("PROMPT >>> ")
 
 	prompt_buffer: [1024]u8
 
@@ -163,4 +177,32 @@ get_input_stdin_from_user :: proc() -> string {
 	}
 
 	return cloned_input
+}
+
+
+save_to_local_MD_file :: proc(file_name, clean_response: string) -> (succcess: bool) {
+	err := os.write_entire_file_from_string(file_name, clean_response)
+	if err != nil {
+		fmt.println("COULD NOT SAVE FILE!")
+		return false
+	}
+	return true
+}
+
+
+generate_file_name :: proc() -> string {
+	now := time.now()
+
+	now_string, ok := time.time_to_rfc3339(now)
+
+	if !ok {
+		fmt.println("Problem with Time")
+	}
+
+	fmt.println("NOW STRING:")
+	fmt.println(now_string)
+
+	file_name := fmt.tprintfln("response_%s.md", string(now_string))
+
+	return file_name
 }

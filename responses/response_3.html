@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gRPC en esencia</title>
+    <meta name="description" content="Explicación visual y estructurada de gRPC para alguien que viene de Python.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --paper: #f5f1e8;
+            --ink: #121212;
+            --red: #d84b2a;
+            --blue: #1670d8;
+            --yellow: #f3c437;
+            --sand: #dfd7c8;
+            --white: #fffaf1;
+            --border: 4px;
+            --shadow: 10px 10px 0 var(--ink);
+            --radius: 24px;
+            --container: 1220px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Outfit", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(243, 196, 55, 0.45), transparent 28%),
+                radial-gradient(circle at top right, rgba(22, 112, 216, 0.18), transparent 32%),
+                linear-gradient(180deg, #f7f3ea 0%, #efe8db 100%);
+            color: var(--ink);
+            min-height: 100vh;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            z-index: 0;
+            border: var(--border) solid var(--ink);
+            opacity: 0.14;
+            pointer-events: none;
+        }
+
+        body::before {
+            width: 18rem;
+            height: 18rem;
+            top: 2rem;
+            left: -4rem;
+            background: var(--red);
+            transform: rotate(18deg);
+        }
+
+        body::after {
+            width: 12rem;
+            height: 12rem;
+            right: 2rem;
+            bottom: 3rem;
+            border-radius: 50%;
+            background: var(--blue);
+        }
+
+        .page {
+            position: relative;
+            z-index: 1;
+            width: min(calc(100% - 2rem), var(--container));
+            margin: 0 auto;
+            padding: 1rem 0 4rem;
+        }
+
+        .masthead {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0 1.5rem;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .masthead__mark,
+        .masthead__context {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.7rem 1rem;
+            border: var(--border) solid var(--ink);
+            background: var(--white);
+            box-shadow: 6px 6px 0 var(--ink);
+        }
+
+        .masthead__dot {
+            width: 0.9rem;
+            height: 0.9rem;
+            background: var(--red);
+            border: 3px solid var(--ink);
+            border-radius: 50%;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+            gap: 1.5rem;
+            align-items: stretch;
+        }
+
+        .panel {
+            border: var(--border) solid var(--ink);
+            border-radius: var(--radius);
+            background: var(--white);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .hero__main {
+            display: grid;
+            grid-template-columns: 140px minmax(0, 1fr);
+            min-height: 28rem;
+        }
+
+        .hero__rail {
+            display: flex;
+            align-items: end;
+            justify-content: center;
+            padding: 1.5rem 1rem;
+            background: var(--yellow);
+            border-right: var(--border) solid var(--ink);
+        }
+
+        .hero__rail-text {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            font-family: "IBM Plex Mono", monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+        }
+
+        .hero__content {
+            padding: 1.8rem;
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            gap: 1.25rem;
+            background:
+                linear-gradient(135deg, rgba(22, 112, 216, 0.08), transparent 40%),
+                linear-gradient(180deg, rgba(216, 75, 42, 0.08), transparent 65%),
+                var(--white);
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: fit-content;
+            padding: 0.6rem 1rem;
+            border: var(--border) solid var(--ink);
+            border-radius: 999px;
+            background: var(--paper);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 0.85rem;
+            height: 0.85rem;
+            border: 3px solid var(--ink);
+            background: var(--blue);
+            transform: rotate(45deg);
+        }
+
+        h1,
+        h2,
+        h3,
+        p,
+        ul,
+        ol,
+        pre {
+            margin: 0;
+        }
+
+        h1 {
+            max-width: 12ch;
+            font-size: clamp(3rem, 6vw, 5.8rem);
+            line-height: 0.92;
+            text-transform: uppercase;
+            letter-spacing: -0.05em;
+        }
+
+        .hero__lede {
+            max-width: 56ch;
+            font-size: clamp(1.05rem, 1.8vw, 1.28rem);
+            line-height: 1.6;
+        }
+
+        .hero__chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-self: end;
+        }
+
+        .chip {
+            padding: 0.8rem 1rem;
+            border: var(--border) solid var(--ink);
+            background: var(--sand);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .hero__summary {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            background: var(--ink);
+            color: var(--white);
+        }
+
+        .hero__summary-header {
+            padding: 1.2rem 1.4rem;
+            border-bottom: var(--border) solid var(--white);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        .hero__summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--border);
+            background: var(--white);
+            padding: var(--border);
+        }
+
+        .summary-card {
+            min-height: 10rem;
+            padding: 1.2rem;
+            color: var(--ink);
+            border: var(--border) solid var(--ink);
+            display: grid;
+            gap: 0.7rem;
+            align-content: start;
+        }
+
+        .summary-card:nth-child(1) {
+            background: var(--yellow);
+        }
+
+        .summary-card:nth-child(2) {
+            background: #d7e8ff;
+        }
+
+        .summary-card:nth-child(3) {
+            background: #ffd6c7;
+        }
+
+        .summary-card:nth-child(4) {
+            background: var(--paper);
+        }
+
+        .summary-card strong {
+            font-size: 2rem;
+            line-height: 0.95;
+            text-transform: uppercase;
+        }
+
+        .summary-card span {
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.88rem;
+            line-height: 1.5;
+        }
+
+        .toc {
+            margin-top: 1.5rem;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .toc a {
+            color: inherit;
+            text-decoration: none;
+            padding: 1rem;
+            border: var(--border) solid var(--ink);
+            background: rgba(255, 250, 241, 0.9);
+            box-shadow: 6px 6px 0 var(--ink);
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            line-height: 1.5;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.52fr);
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .sections {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .section {
+            display: grid;
+            grid-template-columns: 120px minmax(0, 1fr);
+        }
+
+        .section__index {
+            display: flex;
+            align-items: start;
+            justify-content: center;
+            padding: 1.5rem 1rem;
+            border-right: var(--border) solid var(--ink);
+            background: var(--ink);
+            color: var(--white);
+            font-size: clamp(2.6rem, 5vw, 4.1rem);
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .section__body {
+            padding: 1.6rem;
+            display: grid;
+            gap: 1.15rem;
+        }
+
+        .section__body h2 {
+            font-size: clamp(1.55rem, 2vw, 2.2rem);
+            line-height: 1;
+            text-transform: uppercase;
+            letter-spacing: -0.03em;
+        }
+
+        .section__body p,
+        .section__body li {
+            font-size: 1.02rem;
+            line-height: 1.7;
+        }
+
+        .section__body p + p,
+        .section__body ul + p,
+        .section__body ol + p,
+        .section__body p + ul,
+        .section__body p + ol,
+        .section__body ul + ul,
+        .section__body ol + ol {
+            margin-top: -0.2rem;
+        }
+
+        .compare {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .compare__card,
+        .point-card,
+        .step,
+        .sidebar-card {
+            border: var(--border) solid var(--ink);
+            padding: 1rem;
+        }
+
+        .compare__card:nth-child(1) {
+            background: var(--paper);
+        }
+
+        .compare__card:nth-child(2) {
+            background: #d7e8ff;
+        }
+
+        .compare__card h3,
+        .point-card h3,
+        .step h3,
+        .sidebar-card h3 {
+            font-size: 1rem;
+            font-family: "IBM Plex Mono", monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.55rem;
+        }
+
+        .point-grid,
+        .steps {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .point-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .point-card:nth-child(1),
+        .step:nth-child(1) {
+            background: #ffe59f;
+        }
+
+        .point-card:nth-child(2),
+        .step:nth-child(2) {
+            background: #d7e8ff;
+        }
+
+        .point-card:nth-child(3),
+        .step:nth-child(3) {
+            background: #ffd6c7;
+        }
+
+        .point-card:nth-child(4),
+        .step:nth-child(4) {
+            background: #d7f0d2;
+        }
+
+        .code-shell {
+            border: var(--border) solid var(--ink);
+            background: var(--ink);
+            color: var(--white);
+            box-shadow: 8px 8px 0 var(--yellow);
+        }
+
+        .code-shell__top {
+            display: flex;
+            gap: 0.45rem;
+            padding: 0.9rem 1rem;
+            border-bottom: var(--border) solid rgba(255, 255, 255, 0.2);
+        }
+
+        .code-shell__dot {
+            width: 0.8rem;
+            height: 0.8rem;
+            border-radius: 50%;
+            border: 2px solid var(--white);
+        }
+
+        .code-shell__dot:nth-child(1) {
+            background: var(--red);
+        }
+
+        .code-shell__dot:nth-child(2) {
+            background: var(--yellow);
+        }
+
+        .code-shell__dot:nth-child(3) {
+            background: var(--blue);
+        }
+
+        pre {
+            overflow-x: auto;
+            padding: 1.2rem 1rem 1.4rem;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.92rem;
+            line-height: 1.75;
+        }
+
+        code {
+            font-family: "IBM Plex Mono", monospace;
+        }
+
+        :not(pre) > code {
+            padding: 0.15rem 0.38rem;
+            border: 2px solid currentColor;
+            background: rgba(18, 18, 18, 0.06);
+            font-size: 0.92em;
+        }
+
+        ul,
+        ol {
+            padding-left: 1.25rem;
+        }
+
+        li + li {
+            margin-top: 0.55rem;
+        }
+
+        em {
+            font-style: normal;
+            background: linear-gradient(180deg, transparent 57%, rgba(243, 196, 55, 0.5) 57%);
+        }
+
+        .sidebar {
+            display: grid;
+            gap: 1rem;
+            align-content: start;
+        }
+
+        .sidebar-card {
+            background: rgba(255, 250, 241, 0.96);
+            box-shadow: 8px 8px 0 var(--ink);
+        }
+
+        .sidebar-card--blue {
+            background: #d7e8ff;
+        }
+
+        .sidebar-card--yellow {
+            background: #ffe59f;
+        }
+
+        .sidebar-card--red {
+            background: #ffd6c7;
+        }
+
+        .sidebar-card ul,
+        .sidebar-card ol {
+            margin-top: 0.8rem;
+        }
+
+        .summary-banner {
+            margin-top: 1.5rem;
+            padding: 1.4rem 1.6rem;
+            border: var(--border) solid var(--ink);
+            background: linear-gradient(90deg, var(--red) 0 18%, var(--white) 18% 82%, var(--blue) 82% 100%);
+            box-shadow: var(--shadow);
+        }
+
+        .summary-banner p {
+            margin-left: calc(18% + 1rem);
+            margin-right: calc(18% + 1rem);
+            font-size: 1.08rem;
+            line-height: 1.65;
+        }
+
+        .footer-note {
+            margin-top: 1.2rem;
+            text-align: center;
+            font-family: "IBM Plex Mono", monospace;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+        }
+
+        @media (max-width: 1080px) {
+            .hero,
+            .content-grid,
+            .toc {
+                grid-template-columns: 1fr;
+            }
+
+            .toc {
+                gap: 0.85rem;
+            }
+        }
+
+        @media (max-width: 820px) {
+            .hero__main,
+            .section {
+                grid-template-columns: 1fr;
+            }
+
+            .hero__rail,
+            .section__index {
+                border-right: 0;
+                border-bottom: var(--border) solid var(--ink);
+                justify-content: flex-start;
+                align-items: center;
+            }
+
+            .hero__rail-text {
+                writing-mode: initial;
+                transform: none;
+            }
+
+            .compare,
+            .point-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-banner {
+                background: linear-gradient(180deg, var(--red) 0 18%, var(--white) 18% 82%, var(--blue) 82% 100%);
+            }
+
+            .summary-banner p {
+                margin: 1rem 0;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .page {
+                width: min(calc(100% - 1rem), var(--container));
+            }
+
+            .masthead {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .masthead__mark,
+            .masthead__context,
+            .toc a,
+            .sidebar-card,
+            .summary-card,
+            .point-card,
+            .step {
+                box-shadow: 5px 5px 0 var(--ink);
+            }
+
+            h1 {
+                font-size: clamp(2.4rem, 14vw, 4rem);
+            }
+
+            .hero__content,
+            .section__body {
+                padding: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <header class="masthead" aria-label="Contexto del articulo">
+            <div class="masthead__mark">
+                <span class="masthead__dot" aria-hidden="true"></span>
+                <span>Python a Sistemas Distribuidos</span>
+            </div>
+            <div class="masthead__context">Bauhaus Notes / gRPC Primer</div>
+        </header>
+
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="panel hero__main">
+                <div class="hero__rail">
+                    <div class="hero__rail-text">Guía Visual para entender gRPC</div>
+                </div>
+                <div class="hero__content">
+                    <div class="eyebrow">REST vs gRPC</div>
+                    <h1 id="hero-title">gRPC en esencia</h1>
+                    <p class="hero__lede">Para entender <strong>gRPC</strong> viniendo de Python, la mejor forma es compararlo con lo que ya conoces: las <strong>APIs REST</strong> (las típicas peticiones <code>requests.get()</code> o <code>FastAPI</code>).</p>
+                    <div class="hero__chips" aria-label="Puntos de entrada">
+                        <div class="chip">Contrato estricto</div>
+                        <div class="chip">HTTP/2</div>
+                        <div class="chip">Protocol Buffers</div>
+                        <div class="chip">Código generado</div>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="panel hero__summary" aria-label="Resumen rápido">
+                <div class="hero__summary-header">Resumen rápido</div>
+                <div class="hero__summary-grid">
+                    <div class="summary-card">
+                        <strong>REST</strong>
+                        <span>Envía texto JSON. Fácil de leer para humanos, pero más pesado para la máquina.</span>
+                    </div>
+                    <div class="summary-card">
+                        <strong>gRPC</strong>
+                        <span>Envía binario con Protocol Buffers. No es legible, pero es extremadamente rápido.</span>
+                    </div>
+                    <div class="summary-card">
+                        <strong>.proto</strong>
+                        <span>Define funciones, entradas y salidas antes de que cliente y servidor hablen.</span>
+                    </div>
+                    <div class="summary-card">
+                        <strong>Stub</strong>
+                        <span>El cliente se siente como una librería local en lugar de una petición manual.</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <nav class="toc" aria-label="Mapa del contenido">
+            <a href="#que-es">01 / Qué es gRPC</a>
+            <a href="#contrato">02 / El contrato</a>
+            <a href="#mejor-que-rest">03 / Por qué es mejor</a>
+            <a href="#cuando-no">04 / Cuándo no usarlo</a>
+            <a href="#mentalidad-python">05 / Mentalidad Python</a>
+        </nav>
+
+        <div class="content-grid">
+            <main class="sections">
+                <section class="panel section" id="que-es" aria-labelledby="que-es-title">
+                    <div class="section__index">01</div>
+                    <div class="section__body">
+                        <h2 id="que-es-title">¿Qué es gRPC en esencia?</h2>
+                        <p>gRPC es un framework de comunicación entre servicios creado por Google. Imagínalo como una forma de <strong>llamar a una función que vive en otro servidor</strong> como si estuviera en tu propia máquina.</p>
+                        <div class="compare">
+                            <article class="compare__card">
+                                <h3>REST</h3>
+                                <p>Envía texto (JSON). Es fácil de leer para humanos, pero "pesado" para las computadoras.</p>
+                            </article>
+                            <article class="compare__card">
+                                <h3>gRPC</h3>
+                                <p>Envía datos binarios (Protocol Buffers). Es ilegible para humanos, pero <strong>extremadamente rápido</strong> y eficiente para las máquinas.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel section" id="contrato" aria-labelledby="contrato-title">
+                    <div class="section__index">02</div>
+                    <div class="section__body">
+                        <h2 id="contrato-title">La gran diferencia: El "Contrato"</h2>
+                        <p>En Python, cuando haces una API REST, a veces el servidor cambia un campo y tu cliente se rompe porque no sabías qué esperar.</p>
+                        <p>En gRPC, existe un <strong>contrato estricto</strong>. Tú escribes un archivo especial llamado <code>.proto</code> (Protocol Buffers) donde defines qué funciones tiene tu servidor y qué datos recibe/envía.</p>
+                        <p><strong>Ejemplo de cómo se ve un archivo <code>.proto</code>:</strong></p>
+                        <div class="code-shell" aria-label="Ejemplo de archivo proto">
+                            <div class="code-shell__top" aria-hidden="true">
+                                <span class="code-shell__dot"></span>
+                                <span class="code-shell__dot"></span>
+                                <span class="code-shell__dot"></span>
+                            </div>
+                            <pre><code>service Calculadora {
+  rpc Sumar (Numeros) returns (Resultado) {}
+}
+
+message Numeros {
+  int32 a = 1;
+  int32 b = 2;
+}
+
+message Resultado {
+  int32 suma = 1;
+}</code></pre>
+                        </div>
+                        <p><em>Lo increíble es que, una vez tienes ese archivo, <strong>gRPC genera automáticamente el código en Python</strong> (y en otros lenguajes) por ti.</em> Ya no tienes que escribir el "cliente" manualmente.</p>
+                    </div>
+                </section>
+
+                <section class="panel section" id="mejor-que-rest" aria-labelledby="mejor-que-rest-title">
+                    <div class="section__index">03</div>
+                    <div class="section__body">
+                        <h2 id="mejor-que-rest-title">¿Por qué es mejor que REST (para sistemas complejos)?</h2>
+                        <p>Si vienes de Python, seguro has usado JSON. Imagina esto:</p>
+                        <div class="point-grid">
+                            <article class="point-card">
+                                <h3>1. Velocidad (HTTP/2)</h3>
+                                <p>REST usa HTTP/1.1 (petición-respuesta, una a la vez). gRPC usa HTTP/2, que permite enviar múltiples datos al mismo tiempo por la misma conexión (multiplexación) y mantiene la conexión abierta.</p>
+                            </article>
+                            <article class="point-card">
+                                <h3>2. Binario</h3>
+                                <p>Como dijimos, usa Protocol Buffers. Es como pasar un archivo <code>.zip</code> en lugar de enviar el archivo <code>.txt</code> plano. Ocupa mucho menos ancho de banda.</p>
+                            </article>
+                            <article class="point-card">
+                                <h3>3. Tipado fuerte</h3>
+                                <p>En Python, a veces no sabes si un campo es un <code>int</code> o un <code>str</code>. En gRPC, el archivo <code>.proto</code> obliga a que los tipos de datos sean exactos.</p>
+                            </article>
+                            <article class="point-card">
+                                <h3>4. Generación de código</h3>
+                                <p>Olvídate de escribir <code>requests.post(url, json={...})</code>. En gRPC, simplemente haces: <code>stub.Sumar(Numeros(a=5, b=10))</code>.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel section" id="cuando-no" aria-labelledby="cuando-no-title">
+                    <div class="section__index">04</div>
+                    <div class="section__body">
+                        <h2 id="cuando-no-title">¿Cuándo NO usarlo?</h2>
+                        <p>No todo es color de rosa. No deberías usar gRPC si:</p>
+                        <ul>
+                            <li><strong>Tu API es pública:</strong> Si quieres que cualquier desarrollador consuma tu API desde un navegador (JavaScript), REST/JSON es el estándar. gRPC es difícil de usar directamente desde navegadores.</li>
+                            <li><strong>Quieres ver los datos fácilmente:</strong> Si haces <code>print</code> en una red REST, ves JSON. En gRPC ves bytes ilegibles.</li>
+                            <li><strong>Simplicidad extrema:</strong> Para una app sencilla, gRPC es "matar moscas a cañonazos".</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="panel section" id="mentalidad-python" aria-labelledby="mentalidad-python-title">
+                    <div class="section__index">05</div>
+                    <div class="section__body">
+                        <h2 id="mentalidad-python-title">Resumen para tu mentalidad Python</h2>
+                        <p>Si quieres probarlo hoy mismo, busca <strong>"gRPC Python Quickstart"</strong>. Verás este flujo:</p>
+                        <div class="steps">
+                            <article class="step">
+                                <h3>1. Defines el <code>.proto</code></h3>
+                                <p>(tu contrato).</p>
+                            </article>
+                            <article class="step">
+                                <h3>2. Ejecutas un comando</h3>
+                                <p>que genera archivos <code>.py</code> (tu código base).</p>
+                            </article>
+                            <article class="step">
+                                <h3>3. Implementas la lógica</h3>
+                                <p>en el servidor (llenando los métodos vacíos que se crearon).</p>
+                            </article>
+                            <article class="step">
+                                <h3>4. Llamas al cliente</h3>
+                                <p>Y verás que se siente como usar una librería local, pero el resultado viene de otra computadora.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <aside class="sidebar" aria-label="Apoyos laterales">
+                <section class="sidebar-card sidebar-card--blue">
+                    <h3>Idea central</h3>
+                    <p>Piensa en gRPC menos como "hacer requests" y más como <strong>invocar funciones remotas con tipos definidos</strong>.</p>
+                </section>
+
+                <section class="sidebar-card sidebar-card--yellow">
+                    <h3>Cambio mental</h3>
+                    <ol>
+                        <li>Con REST piensas en endpoints y payloads.</li>
+                        <li>Con gRPC piensas en servicios, métodos y contratos.</li>
+                    </ol>
+                </section>
+
+                <section class="sidebar-card sidebar-card--red">
+                    <h3>Tradeoff</h3>
+                    <p>Ganas velocidad, rigor y tooling. Pierdes parte de la inspección visual y de la flexibilidad informal de JSON.</p>
+                </section>
+
+                <section class="sidebar-card">
+                    <h3>Checklist rápida</h3>
+                    <ul>
+                        <li>Microservicios internos: sí.</li>
+                        <li>Navegador público: mejor REST.</li>
+                        <li>Tipos exactos: sí.</li>
+                        <li>Debug visual simple: no tanto.</li>
+                    </ul>
+                </section>
+            </aside>
+        </div>
+
+        <section class="summary-banner" aria-label="Cierre">
+                    <p><strong>En resumen:</strong> gRPC es para cuando necesitas que <strong>microservicios hablen entre sí</strong> de la forma más rápida y segura posible, dejando de lado la flexibilidad de JSON por la rigurosidad de los tipos y la velocidad del binario.</p>
+        </section>
+
+        <div class="footer-note">Todo el contenido original se mantiene; la diferencia está en la estructura, el ritmo visual y la jerarquía tipográfica.</div>
+    </div>
+</body>
+</html>
