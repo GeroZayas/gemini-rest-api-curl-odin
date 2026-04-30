@@ -10,11 +10,12 @@ package main
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import "core:strings"
 import "core:time"
 import "vendor:curl"
-
+import rl "vendor:raylib"
 
 GEMINI_MODEL :: "gemini-3.1-flash-lite-preview"
 
@@ -35,48 +36,81 @@ GeminiResponse :: struct {
 }
 
 
+WINDOW_WIDTH :: 1000
+WINDOW_HEIGHT :: 700
+
 main :: proc() {
 
+	context.logger = log.create_console_logger()
 
-	fmt.println("PROMPT >>> ")
-	the_input := get_input_stdin_from_user()
 
-	raw_response := make_request_to_gemini(the_input)
 
-	// fmt.println(raw_response)
 
-	fmt.println("------------------------------------------")
+	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Gemini Rest API")
+	defer rl.CloseWindow()
+	rl.SetTargetFPS(60)
 
-	response, ok := extract_text_from_response(raw_response)
+	screen := 1
+	circle: int = 1
+	for !rl.WindowShouldClose() {
+		rl.BeginDrawing()
+		defer rl.EndDrawing()
 
-	if !ok {
-		fmt.println("No pude leer el texto del response")
-		return
+		switch screen {
+			case 1:
+				white_background()
+			case 2: 
+				blue_background()
+			case 3:
+				green_background()
+			case:
+				screen = 1
+		}
+
+		if rl.GuiButton({WINDOW_WIDTH - 40 - 60, WINDOW_HEIGHT - 40 - 40, 60, 40}, "Next"){
+			screen += 1
+			circle = 1
+		}
+
+		if screen != 1 {
+			if rl.GuiButton({40, WINDOW_HEIGHT - 40 - 40, 60, 40}, "Previous"){
+				screen -= 1
+				circle = 1 
+			}
+		}
+	
 	}
 
-	fmt.println(response)
 
-	fmt.println("Name of File: >>> ")
-	the_name := get_input_stdin_from_user()
-
-	file_name: string
-
-	if the_name == "" {
-		file_name = generate_file_name()
-	} else {
-		file_name = the_name
-	}
-
-	fmt.printfln("SAVING FILE TO `%s`...", file_name)
-	save_success := save_to_local_MD_file(file_name, response)
-
-	if !save_success {
-		fmt.println("❌ Saving file NOT SUCCESSFUL!")
-	} else {
-		fmt.println("✅ Saving file SUCCESSFUL!")
-	}
+}
 
 
+white_background :: proc() {
+	TITLE_TEXT :: "Gemini Rest API"
+	TITLE_TEXT_SIZE :: 30
+	rl.ClearBackground(rl.RAYWHITE)	
+	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
+	// log.info(title_text_width)
+	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 20, TITLE_TEXT_SIZE, rl.BLUE)
+
+}
+
+blue_background :: proc() {
+	TITLE_TEXT :: "Gemini Rest API BLUE"
+	TITLE_TEXT_SIZE :: 60
+	rl.ClearBackground(rl.BLUE)	
+	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
+	// log.info(title_text_width)
+	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 20, TITLE_TEXT_SIZE, rl.YELLOW)
+}
+
+green_background :: proc() {
+	TITLE_TEXT :: "Gemini Rest API GREEN"
+	TITLE_TEXT_SIZE :: 100
+	rl.ClearBackground(rl.GREEN)	
+	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
+	// log.info(title_text_width)
+	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 30, TITLE_TEXT_SIZE, rl.WHITE)
 }
 
 extract_text_from_response :: proc(json_raw: string) -> (string, bool) {
