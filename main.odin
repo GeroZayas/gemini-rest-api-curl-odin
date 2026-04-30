@@ -52,13 +52,20 @@ main :: proc() {
 
 	screen := 1
 	circle: int = 1
+
+	// INPUT PROMPT Vars
+	prompt_buffer: [1024]u8
+	user_promtp := ""
+	prompt_edit_mode := true 
+
+	// MAIN LOOP
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
 		defer rl.EndDrawing()
 
 		switch screen {
 			case 1:
-				white_background()
+				white_background(&prompt_buffer, &user_promtp, &prompt_edit_mode)
 			case 2: 
 				blue_background()
 			case 3:
@@ -85,13 +92,38 @@ main :: proc() {
 }
 
 
-white_background :: proc() {
+white_background :: proc(prompt_buf: ^[1024]u8, user_prompt: ^string, p_edit_mode: ^bool) {
 	TITLE_TEXT :: "Gemini Rest API"
 	TITLE_TEXT_SIZE :: 30
 	rl.ClearBackground(rl.RAYWHITE)	
 	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
 	// log.info(title_text_width)
 	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 20, TITLE_TEXT_SIZE, rl.BLUE)
+
+	rl.GuiLabel({50, 50, 300, 20}, "Insert Prompt")
+	if rl.GuiTextBox({50, 70, 900, 20}, cstring(&prompt_buf[0]), i32(len(prompt_buf)), p_edit_mode^){
+		p_edit_mode^ = !p_edit_mode^
+	}
+
+
+	if rl.GuiButton({50, 100, 100, 20}, "Send"){
+		text_len := int(rl.TextLength(cstring(&prompt_buf[0])))
+		text_value := string(prompt_buf[:text_len])
+
+		cloned_text, clone_err := strings.clone(text_value)
+		if clone_err != nil {
+			fmt.println("Some error with cloning the string")
+		} else {
+			user_prompt^ = cloned_text
+		}
+		
+	}
+	
+	if user_prompt^ != "" {
+		rl.DrawText(cstring(raw_data(user_prompt^)), 50, 150, 30, rl.RED)
+		// rl.GuiLabel({50, 300, 300, 20}, cstring(raw_data(user_prompt^)))
+	}
+
 
 }
 
