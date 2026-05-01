@@ -35,6 +35,8 @@ GeminiResponse :: struct {
 	candidates: []Candidate,
 }
 
+gr :: GeminiResponse
+
 
 WINDOW_WIDTH :: 1000
 WINDOW_HEIGHT :: 700
@@ -42,8 +44,6 @@ WINDOW_HEIGHT :: 700
 main :: proc() {
 
 	context.logger = log.create_console_logger()
-
-
 
 
 	rl.InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Gemini Rest API")
@@ -56,7 +56,7 @@ main :: proc() {
 	// INPUT PROMPT Vars
 	prompt_buffer: [1024]u8
 	user_promtp := ""
-	prompt_edit_mode := true 
+	prompt_edit_mode := true
 
 	// MAIN LOOP
 	for !rl.WindowShouldClose() {
@@ -64,49 +64,49 @@ main :: proc() {
 		defer rl.EndDrawing()
 
 		switch screen {
-			case 1:
-				white_background(&prompt_buffer, &user_promtp, &prompt_edit_mode)
-			case 2: 
-				blue_background()
-			case 3:
-				green_background()
-			case:
-				screen = 1
+		case 1:
+			white_background(&prompt_buffer, &user_promtp, &prompt_edit_mode)
+		case 2:
+			blue_background()
+		case 3:
+			green_background()
+		case:
+			screen = 1
 		}
 
-		if rl.GuiButton({WINDOW_WIDTH - 40 - 60, WINDOW_HEIGHT - 40 - 40, 60, 40}, "Next"){
+		if rl.GuiButton({WINDOW_WIDTH - 40 - 60, WINDOW_HEIGHT - 40 - 40, 60, 40}, "Next") {
 			screen += 1
 			circle = 1
 		}
 
 		if screen != 1 {
-			if rl.GuiButton({40, WINDOW_HEIGHT - 40 - 40, 60, 40}, "Previous"){
+			if rl.GuiButton({40, WINDOW_HEIGHT - 40 - 40, 60, 40}, "Previous") {
 				screen -= 1
-				circle = 1 
+				circle = 1
 			}
 		}
-	
+
 	}
-
-
 }
 
 
 white_background :: proc(prompt_buf: ^[1024]u8, user_prompt: ^string, p_edit_mode: ^bool) {
 	TITLE_TEXT :: "Gemini Rest API"
 	TITLE_TEXT_SIZE :: 30
-	rl.ClearBackground(rl.RAYWHITE)	
+	rl.ClearBackground(rl.RAYWHITE)
 	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
+
 	// log.info(title_text_width)
-	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 20, TITLE_TEXT_SIZE, rl.BLUE)
+	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width / 2)), 20, TITLE_TEXT_SIZE, rl.BLUE)
 
 	rl.GuiLabel({50, 50, 300, 20}, "Insert Prompt")
-	if rl.GuiTextBox({50, 70, 900, 20}, cstring(&prompt_buf[0]), i32(len(prompt_buf)), p_edit_mode^){
+
+	if rl.GuiTextBox({50, 70, 900, 20}, cstring(&prompt_buf[0]), i32(len(prompt_buf)), p_edit_mode^) {
 		p_edit_mode^ = !p_edit_mode^
 	}
 
 
-	if rl.GuiButton({50, 100, 100, 20}, "Send"){
+	if rl.GuiButton({50, 100, 100, 20}, "Send") {
 		text_len := int(rl.TextLength(cstring(&prompt_buf[0])))
 		text_value := string(prompt_buf[:text_len])
 
@@ -116,12 +116,11 @@ white_background :: proc(prompt_buf: ^[1024]u8, user_prompt: ^string, p_edit_mod
 		} else {
 			user_prompt^ = cloned_text
 		}
-		
+
 	}
-	
+
 	if user_prompt^ != "" {
 		rl.DrawText(cstring(raw_data(user_prompt^)), 50, 150, 30, rl.RED)
-		// rl.GuiLabel({50, 300, 300, 20}, cstring(raw_data(user_prompt^)))
 	}
 
 
@@ -130,23 +129,23 @@ white_background :: proc(prompt_buf: ^[1024]u8, user_prompt: ^string, p_edit_mod
 blue_background :: proc() {
 	TITLE_TEXT :: "Gemini Rest API BLUE"
 	TITLE_TEXT_SIZE :: 60
-	rl.ClearBackground(rl.BLUE)	
+	rl.ClearBackground(rl.BLUE)
 	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
 	// log.info(title_text_width)
-	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 20, TITLE_TEXT_SIZE, rl.YELLOW)
+	rl.DrawText( TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width / 2)), 20, TITLE_TEXT_SIZE, rl.YELLOW)
 }
 
 green_background :: proc() {
 	TITLE_TEXT :: "Gemini Rest API GREEN"
 	TITLE_TEXT_SIZE :: 100
-	rl.ClearBackground(rl.GREEN)	
+	rl.ClearBackground(rl.GREEN)
 	title_text_width := rl.MeasureText(TITLE_TEXT, TITLE_TEXT_SIZE)
 	// log.info(title_text_width)
-	rl.DrawText(TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width/2)), 30, TITLE_TEXT_SIZE, rl.WHITE)
+	rl.DrawText( TITLE_TEXT, ((WINDOW_WIDTH / 2) - (title_text_width / 2)), 30, TITLE_TEXT_SIZE, rl.WHITE)
 }
 
 extract_text_from_response :: proc(json_raw: string) -> (string, bool) {
-	response: GeminiResponse
+	response: gr
 	err := json.unmarshal_string(json_raw, &response)
 	if err != nil {
 		return "", false
